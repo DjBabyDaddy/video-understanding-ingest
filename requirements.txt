@@ -1,0 +1,4 @@
+yt-dlp>=2025.1.15
+openai>=1.60.0
+pillow>=10.0.0
+pytesseract>=0.3.13

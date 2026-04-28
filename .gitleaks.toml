@@ -1,0 +1,4 @@
+title = "video-understanding-ingest gitleaks config"
+
+[extend]
+useDefault = true

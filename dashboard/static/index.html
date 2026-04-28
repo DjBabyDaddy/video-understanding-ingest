@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video Understanding</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <h1>Video Understanding</h1>
+        <p>Upload a video or paste a public URL. The analysis runs locally and writes files on this computer.</p>
+      </div>
+      <button id="refreshDeps" class="icon-button" title="Refresh dependency check">↻</button>
+    </header>
+
+    <section class="status-band">
+      <div>
+        <span class="label">Runtime</span>
+        <pre id="deps">Checking...</pre>
+      </div>
+    </section>
+
+    <section class="workspace">
+      <div class="panel">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="upload">Upload</button>
+          <button class="tab" data-tab="url">URL</button>
+        </div>
+
+        <form id="uploadForm" class="form active">
+          <label>
+            Video file
+            <input type="file" name="video" accept="video/*">
+          </label>
+          <div class="options">
+            <label>Depth
+              <select name="frame_mode">
+                <option value="sample">Sampled frames</option>
+                <option value="key">Scene/key frames</option>
+                <option value="all">Every frame</option>
+                <option value="none">Audio only</option>
+              </select>
+            </label>
+            <label>FPS
+              <input name="fps" type="number" min="0.1" step="0.1" value="1">
+            </label>
+            <label>Transcript
+              <select name="transcribe">
+                <option value="auto">Auto</option>
+                <option value="openai">OpenAI</option>
+                <option value="whisper">Whisper</option>
+                <option value="none">None</option>
+              </select>
+            </label>
+            <label>OCR
+              <select name="ocr">
+                <option value="auto">Auto</option>
+                <option value="tesseract">Tesseract</option>
+                <option value="none">None</option>
+              </select>
+            </label>
+          </div>
+          <button type="submit" class="primary">Run Analysis</button>
+        </form>
+
+        <form id="urlForm" class="form">
+          <label>
+            Public URL
+            <input name="url" type="url" placeholder="https://example.com/video.mp4">
+          </label>
+          <div class="options">
+            <label>URL mode
+              <select name="url_mode">
+                <option value="auto">Auto</option>
+                <option value="direct">Direct media</option>
+                <option value="yt-dlp">Public page</option>
+              </select>
+            </label>
+            <label>Depth
+              <select name="frame_mode">
+                <option value="sample">Sampled frames</option>
+                <option value="key">Scene/key frames</option>
+                <option value="all">Every frame</option>
+                <option value="none">Audio only</option>
+              </select>
+            </label>
+            <label>FPS
+              <input name="fps" type="number" min="0.1" step="0.1" value="1">
+            </label>
+            <label>Transcript
+              <select name="transcribe">
+                <option value="auto">Auto</option>
+                <option value="openai">OpenAI</option>
+                <option value="whisper">Whisper</option>
+                <option value="none">None</option>
+              </select>
+            </label>
+            <label>OCR
+              <select name="ocr">
+                <option value="auto">Auto</option>
+                <option value="tesseract">Tesseract</option>
+                <option value="none">None</option>
+              </select>
+            </label>
+          </div>
+          <button type="submit" class="primary">Run Analysis</button>
+        </form>
+      </div>
+
+      <aside class="panel jobs-panel">
+        <div class="panel-head">
+          <h2>Jobs</h2>
+          <button id="refreshJobs" class="icon-button" title="Refresh jobs">↻</button>
+        </div>
+        <div id="jobs" class="jobs"></div>
+      </aside>
+    </section>
+
+    <section class="log-band">
+      <div class="panel-head">
+        <h2>Selected Job Log</h2>
+        <button id="openOutput" class="secondary" disabled>Open Output Folder</button>
+      </div>
+      <pre id="log">No job selected.</pre>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video Understanding Ingest"
+  short_description: "Turn videos, URLs, or recordings into data"
+  default_prompt: "Use $video-understanding-ingest to analyze this local video, public URL, or authorized screen recording into transcript, frames, OCR, and structured JSON artifacts."
