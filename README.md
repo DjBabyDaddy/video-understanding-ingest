@@ -12,16 +12,28 @@ This project turns an authorized local video, public unauthenticated video URL, 
 - contact sheets
 - JSON artifact index
 - optional Obsidian learning digest
+- optional assimilation sidecar
 
 It is designed for learning from creator videos, coding walkthroughs, technical demos, and build logs without keeping bulky raw artifacts forever.
 
-## Why This Upgrade Is Different
+## Project Evolution
 
-The first release was useful but artifact-heavy: if you forgot `--output-dir`,
-raw frames, audio, transcripts, OCR, contact sheets, and indexes were written
-beside the source video.
+This repo has evolved in three clear stages.
 
-The upgraded flow is quarantine-first and learning-first:
+### 1. Original: Artifact Extractor
+
+The first version was a local video evidence tool. It took an authorized local
+video, public unauthenticated video URL, or user-authorized screen recording and
+produced analysis artifacts: metadata, audio, transcript, frames, OCR, contact
+sheets, and `analysis_index.json`.
+
+That was useful, but artifact-heavy. If you forgot `--output-dir`, raw frames,
+audio, transcripts, OCR, contact sheets, and indexes could be written beside the
+source video.
+
+### 2. First Upgrade: Quarantine And Learning
+
+The next version made the flow quarantine-first and learning-first:
 
 - `video_digest.py` is the preferred path for learning. It creates durable
   Obsidian-ready notes and removes temporary raw artifacts by default.
@@ -34,6 +46,22 @@ The upgraded flow is quarantine-first and learning-first:
 - The skill guidance now treats each video as a reusable source item: transcript,
   OCR, frames, metadata, and contact sheets feed tools, workflows, risks, content
   ideas, and implementation leads instead of stopping at raw extraction.
+
+### 3. Current: Structured Assimilation
+
+The current version uses a structured lesson-compression pattern learned from
+Trell's broader harness work. That outside harness process does not run this
+repo, replace this repo, patch this repo, or become part of the video extraction
+backend.
+
+What this repo assimilates is the lesson structure:
+
+`source -> problem -> lesson -> scope -> validation -> risk -> next use`
+
+- `video_digest.py` now writes `06-ASSIMILATION-ASSETS/*-assimilation.json`
+  in the learning vault. This captures source, evidence profile, decision queue,
+  reusable lesson template, validation gate, risk, and next use so agents can
+  upgrade a harness without blindly adopting video claims.
 
 ## Safety Boundary
 
@@ -110,6 +138,12 @@ python .\skill\video-understanding-ingest\scripts\video_digest.py "C:\path\to\vi
 ```
 
 Use `--keep-artifacts` only when you need debug evidence.
+
+Digest mode writes three durable outputs:
+
+- `01-DIGESTS/*`: full human-readable evidence note.
+- `05-CODEX-IMPORTS/*`: compact agent import note.
+- `06-ASSIMILATION-ASSETS/*`: machine-readable harness-upgrade sidecar.
 
 ## Dashboard
 

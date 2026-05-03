@@ -16,6 +16,9 @@ from pathlib import Path
 from typing import Any
 
 
+ASSIMILATION_SCHEMA = "video-assimilation-v1"
+
+
 def default_vault() -> Path:
     configured = os.environ.get("VIDEO_LEARNING_VAULT")
     if configured:
@@ -59,6 +62,171 @@ def load_transcript(path: Path | None) -> tuple[str, list[dict[str, Any]]]:
     return data.get("text", ""), data.get("segments", [])
 
 
+def compact_text(value: Any, limit: int = 240) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "..."
+
+
+def artifact_names(index: dict[str, Any]) -> list[str]:
+    artifacts = index.get("artifacts", {})
+    if not isinstance(artifacts, dict):
+        return []
+    return sorted(name for name, value in artifacts.items() if value)
+
+
+def sample_segments(segments: list[dict[str, Any]], limit: int = 12) -> list[dict[str, Any]]:
+    samples: list[dict[str, Any]] = []
+    for seg in segments[:limit]:
+        text = compact_text(seg.get("text"))
+        if not text:
+            continue
+        samples.append({"start": seg.get("start"), "end": seg.get("end"), "text": text})
+    return samples
+
+
+def sample_ocr_rows(ocr_rows: list[dict[str, Any]], limit: int = 12) -> list[dict[str, Any]]:
+    samples: list[dict[str, Any]] = []
+    for row in ocr_rows[:limit]:
+        text = compact_text(row.get("text"))
+        if not text:
+            continue
+        samples.append({"timestamp_sec": row.get("timestamp_sec"), "text": text})
+    return samples
+
+
+def build_assimilation_asset(
+    source: str,
+    title: str,
+    analyzed: str,
+    index: dict[str, Any],
+    links: list[str],
+    transcript_text: str,
+    segments: list[dict[str, Any]],
+    ocr_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Create a structured lesson asset without invoking outside automation."""
+    available = artifact_names(index)
+    warnings = index.get("warnings", [])
+    if not isinstance(warnings, list):
+        warnings = [str(warnings)]
+
+    decisions = [
+        {
+            "status": "test-next",
+            "reason": "Any named tool, repo, CLI, MCP, workflow, or claim from the video needs primary-source verification before it becomes a harness rule.",
+            "evidence": "links/transcript/OCR samples",
+        },
+        {
+            "status": "monetize",
+            "reason": "If the lesson improves content generation, package the proof as a repeatable service, content asset, or client workflow.",
+            "evidence": "human/Codex follow-up pass",
+        },
+    ]
+    if not links:
+        decisions.append(
+            {
+                "status": "watch",
+                "reason": "No external links were detected automatically; a visual/manual pass may be needed before tool adoption.",
+                "evidence": "link extraction returned none",
+            }
+        )
+    if not transcript_text and not ocr_rows:
+        decisions.append(
+            {
+                "status": "watch",
+                "reason": "The digest has weak semantic evidence because no transcript or OCR text was captured.",
+                "evidence": "missing transcript/OCR",
+            }
+        )
+
+    return {
+        "type": "VideoAssimilationAsset",
+        "schema_version": ASSIMILATION_SCHEMA,
+        "source": source,
+        "title": title,
+        "created": analyzed,
+        "evidence_profile": {
+            "available_artifacts": available,
+            "transcript_segments": len(segments),
+            "ocr_rows_sampled": len(ocr_rows),
+            "links_detected": len(links),
+            "warnings": warnings,
+            "raw_artifacts_policy": "temporary unless --keep-artifacts is used",
+        },
+        "evidence_samples": {
+            "transcript": sample_segments(segments),
+            "ocr": sample_ocr_rows(ocr_rows),
+            "links": links[:40],
+        },
+        "decision_queue": decisions,
+        "evolution_template": {
+            "source": source,
+            "problem": "What recurring harness/content/workflow problem does this video expose?",
+            "lesson": "What compact reusable rule, method, helper route, or prompt pattern should be retained?",
+            "scope": "Which projects, lanes, data classes, or content types should use this lesson?",
+            "validation": "What primary source, local test, proof output, or human approval is required before adoption?",
+            "risk": "What could go wrong: privacy, platform rules, tool trust, cost, client exposure, or hallucinated claims?",
+            "next_use": "The next concrete task where this lesson should be applied.",
+        },
+        "promotion_gate": {
+            "adopt_now_requires": [
+                "primary-source verification for named tools/repos/claims",
+                "local smoke test or small proof output when behavior changes",
+                "harness doc/helper registry/shared memory update",
+            ],
+            "publish_requires": [
+                "rights/data-class approval",
+                "sanitized derivative or summary only",
+                "no raw private media or credentials",
+            ],
+        },
+    }
+
+
+def format_assimilation_markdown(asset: dict[str, Any]) -> str:
+    profile = asset["evidence_profile"]
+    decisions = asset["decision_queue"]
+    template = asset["evolution_template"]
+    gates = asset["promotion_gate"]
+    decision_lines = [
+        f"- `{item['status']}`: {item['reason']} Evidence: {item['evidence']}"
+        for item in decisions
+    ]
+    return f"""## Structured Assimilation Asset
+
+This section applies a structured lesson-compression pattern to video learning: source signal -> problem -> reusable lesson -> scope -> validation -> risk -> next use. It is a decision aid, not an automatic code patch.
+
+Evidence profile:
+
+- Available artifacts: {", ".join(profile["available_artifacts"]) or "none"}
+- Transcript segments: {profile["transcript_segments"]}
+- OCR rows sampled: {profile["ocr_rows_sampled"]}
+- Links detected: {profile["links_detected"]}
+- Raw artifact policy: {profile["raw_artifacts_policy"]}
+
+Decision queue:
+
+{chr(10).join(decision_lines)}
+
+Evolution template:
+
+- Source: {template["source"]}
+- Problem: {template["problem"]}
+- Lesson: {template["lesson"]}
+- Scope: {template["scope"]}
+- Validation: {template["validation"]}
+- Risk: {template["risk"]}
+- Next use: {template["next_use"]}
+
+Promotion gate:
+
+- Adopt now requires: {"; ".join(gates["adopt_now_requires"])}
+- Publish requires: {"; ".join(gates["publish_requires"])}
+"""
+
+
 def format_tags(tags_arg: str | None) -> str:
     """Return a YAML list block for frontmatter tags."""
     if tags_arg:
@@ -90,13 +258,16 @@ def build_digest(
     digest_dir = vault / "01-DIGESTS"
     import_dir = vault / "05-CODEX-IMPORTS"
     link_dir = vault / "03-REPOS-LINKS"
+    assimilation_dir = vault / "06-ASSIMILATION-ASSETS"
     digest_dir.mkdir(parents=True, exist_ok=True)
     import_dir.mkdir(parents=True, exist_ok=True)
     link_dir.mkdir(parents=True, exist_ok=True)
+    assimilation_dir.mkdir(parents=True, exist_ok=True)
 
     note_title = title or slug.replace("-", " ").title()
     digest_path = digest_dir / f"{analyzed}-{slug}.md"
     import_path = import_dir / f"{analyzed}-{slug}-codex-import.md"
+    assimilation_path = assimilation_dir / f"{analyzed}-{slug}-assimilation.json"
 
     segment_lines = []
     for seg in segments[:40]:
@@ -113,6 +284,13 @@ def build_digest(
             ocr_lines.append(f"- `{row.get('timestamp_sec')}`: {text}")
 
     link_lines = [f"- {link}" for link in links] or ["- None detected automatically."]
+    assimilation_asset = build_assimilation_asset(source, note_title, analyzed, index, links, transcript_text, segments, ocr_rows)
+    assimilation_asset["durable_outputs"] = {
+        "digest": str(digest_path),
+        "codex_import": str(import_path),
+        "assimilation_asset": str(assimilation_path),
+    }
+    assimilation_markdown = format_assimilation_markdown(assimilation_asset)
 
     digest = f"""---
 type: video-digest
@@ -123,6 +301,7 @@ created: "{analyzed}"
 tags:
 {format_tags(tags)}
 raw_artifacts: temporary
+assimilation_schema: "{ASSIMILATION_SCHEMA}"
 ---
 
 # {note_title}
@@ -150,6 +329,8 @@ This note was generated as a durable learning digest from a video source. Codex 
 ## Code/System Patterns To Reuse
 
 - TODO: Add patterns worth reusing in Codex/Claude Code sessions.
+
+{assimilation_markdown}
 
 ## Transcript Evidence Sample
 
@@ -184,6 +365,12 @@ Analyzed: {analyzed}
 
 {chr(10).join(link_lines)}
 
+## Assimilation Asset
+
+JSON sidecar: `{assimilation_path}`
+
+Use the sidecar to turn this video into verified harness updates. Do not promote a tool, repo, workflow, MCP, or public claim until the promotion gate is satisfied.
+
 ## Evidence Note
 
 Full digest: [[{digest_path.stem}]]
@@ -191,12 +378,13 @@ Full digest: [[{digest_path.stem}]]
 
     digest_path.write_text(digest, encoding="utf-8")
     import_path.write_text(codex_import, encoding="utf-8")
+    assimilation_path.write_text(json.dumps(assimilation_asset, indent=2), encoding="utf-8")
 
     if links:
         link_note = link_dir / f"{analyzed}-{slug}-links.md"
         link_note.write_text(f"# Links From {note_title}\n\n" + "\n".join(link_lines) + "\n", encoding="utf-8")
 
-    return digest_path, import_path
+    return digest_path, import_path, assimilation_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -240,9 +428,10 @@ def main() -> int:
 
     try:
         subprocess.run(cmd, check=True)
-        digest_path, import_path = build_digest(args.source, analysis_dir, args.vault, args.title, args.creator, args.tags)
+        digest_path, import_path, assimilation_path = build_digest(args.source, analysis_dir, args.vault, args.title, args.creator, args.tags)
         print(f"Digest: {digest_path}")
         print(f"Codex import: {import_path}")
+        print(f"Assimilation asset: {assimilation_path}")
         if args.keep_artifacts:
             print(f"Kept artifacts: {analysis_dir}")
         return 0

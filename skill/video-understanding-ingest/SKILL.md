@@ -34,6 +34,35 @@ The upgraded flow is learning-first and quarantine-first:
    video-learning vault. Do not place raw video/audio/frame/OCR dumps in a Git
    workspace unless the data class allows it and the user explicitly asks.
 
+## Structured Assimilation Pattern
+
+The broader harness uses a lesson-compression pattern that is useful here, but
+that outside process is not the video ingest engine. Do not combine the systems
+or let any outside evolution process patch this skill during normal video work.
+
+What video ingest owns:
+
+- lawful media access boundary
+- ffmpeg/ffprobe extraction
+- transcript, OCR, frames, metadata, contact sheets
+- quarantine and temporary artifact cleanup
+- durable video-learning digest notes
+
+What this skill assimilates:
+
+- turn each video into an auditable source signal
+- describe the recurring problem the video exposes
+- compress the lesson into a reusable rule, method, helper route, or prompt
+  pattern
+- record scope, validation, risk, and next use before adoption
+- keep a machine-readable sidecar for later harness evolution
+
+`video_digest.py` now writes a `06-ASSIMILATION-ASSETS/*-assimilation.json`
+sidecar in the video-learning vault. Treat that JSON as the bridge from video
+evidence to harness upgrades. It is intentionally separate from raw extraction
+artifacts, and it does not promote a tool, MCP, CLI, workflow, or public claim
+without primary-source verification and the promotion gate in the sidecar.
+
 Default quarantine root:
 
 `VIDEO_INGEST_QUARANTINE_ROOT`, or `~/Video-Ingest-Quarantine` when the
