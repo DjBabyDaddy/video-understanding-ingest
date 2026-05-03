@@ -11,6 +11,37 @@ Process only sources the user can lawfully access: local video files, user expor
 
 This skill is for understanding video content after access has been resolved, not for defeating access controls.
 
+## What Changed In The Upgraded Flow
+
+The old flow was artifact-first: it created raw analysis folders beside the
+source video unless every run provided an explicit `--output-dir`.
+
+The upgraded flow is learning-first and quarantine-first:
+
+1. Prefer `scripts/video_digest.py` when the goal is durable understanding. It
+   extracts evidence, writes compact notes, and deletes temporary raw artifacts
+   by default.
+2. Use `scripts/video_ingest.py` when audit/debug artifacts are needed. If
+   `--output-dir` is omitted, raw frames, audio, transcripts, OCR, contact
+   sheets, and indexes go to a quarantine root instead of cluttering the source
+   folder.
+3. Treat each video as a reusable source item: extract tools, methods, claims,
+   workflows, risks, content ideas, and implementation leads from transcript,
+   OCR, frames, metadata, and contact sheets.
+4. Verify primary sources before adopting tools, publishing claims, or creating
+   client-facing content.
+5. Keep raw/generated extraction artifacts in quarantine or a configured
+   video-learning vault. Do not place raw video/audio/frame/OCR dumps in a Git
+   workspace unless the data class allows it and the user explicitly asks.
+
+Default quarantine root:
+
+`VIDEO_INGEST_QUARANTINE_ROOT`, or `~/Video-Ingest-Quarantine` when the
+environment variable is not set.
+
+Override with `--quarantine-root` or `VIDEO_INGEST_QUARANTINE_ROOT` when a
+project-specific quarantine is safer.
+
 ## Memory-First Workflow
 
 When the user's goal is for Codex or Claude Code to learn from a video, prefer `scripts/video_digest.py` over `scripts/video_ingest.py`.
@@ -49,12 +80,14 @@ Use the bundled script for repeatable ingestion:
 ```powershell
 python "$HOME\.codex\skills\video-understanding-ingest\scripts\video_ingest.py" `
   "C:\path\to\video.mp4" `
-  --output-dir "C:\path\to\analysis" `
   --frame-mode sample `
   --fps 1 `
   --transcribe auto `
   --ocr auto
 ```
+
+When `--output-dir` is omitted, generated artifacts go to the quarantine root.
+Use `--output-dir` only for a deliberate audit/debug location.
 
 For a public unauthenticated URL:
 

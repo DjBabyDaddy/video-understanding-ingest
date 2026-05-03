@@ -25,3 +25,5 @@ screen_recording_*/
 *.log
 .DS_Store
 Thumbs.db
+.gitnexus
+.claude/

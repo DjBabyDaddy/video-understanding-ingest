@@ -20,6 +20,7 @@ from typing import Any
 
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi", ".mpeg", ".mpg", ".wmv"}
+DEFAULT_QUARANTINE_ROOT = Path(os.environ.get("VIDEO_INGEST_QUARANTINE_ROOT", Path.home() / "Video-Ingest-Quarantine"))
 TOOL_ENV_VARS = {
     "ffmpeg": "VIDEO_INGEST_FFMPEG",
     "ffprobe": "VIDEO_INGEST_FFPROBE",
@@ -27,6 +28,43 @@ TOOL_ENV_VARS = {
     "whisper": "VIDEO_INGEST_WHISPER",
     "tesseract": "VIDEO_INGEST_TESSERACT",
 }
+USER_SITE = Path.home() / "AppData" / "Roaming" / "Python" / f"Python{sys.version_info.major}{sys.version_info.minor}" / "site-packages"
+if USER_SITE.exists() and str(USER_SITE) not in sys.path:
+    sys.path.append(str(USER_SITE))
+KNOWN_TOOL_PATHS = {
+    "ffmpeg": [
+        Path(r"C:\Program Files\Streamlabs OBS\resources\app.asar.unpacked\node_modules\obs-studio-node\ffmpeg.exe"),
+        Path(r"C:\Program Files\SteelSeries\GG\apps\moments\ffmpeg.exe"),
+    ],
+    "ffprobe": [
+        Path(r"C:\Program Files\Streamlabs OBS\resources\app.asar.unpacked\node_modules\obs-studio-node\ffprobe.exe"),
+    ],
+}
+
+
+def tool_env() -> dict[str, str]:
+    env = os.environ.copy()
+    extra_dirs: list[str] = []
+    for name in ("ffmpeg", "ffprobe"):
+        if shutil.which(name, path=env.get("PATH")):
+            continue
+        configured = os.environ.get(TOOL_ENV_VARS[name])
+        if configured and Path(configured).expanduser().exists():
+            parent = str(Path(configured).expanduser().parent)
+            if parent not in extra_dirs:
+                extra_dirs.append(parent)
+            continue
+        for candidate in KNOWN_TOOL_PATHS.get(name, []):
+            if candidate.exists():
+                parent = str(candidate.parent)
+                if parent not in extra_dirs:
+                    extra_dirs.append(parent)
+                break
+    if extra_dirs:
+        env["PATH"] = os.pathsep.join(extra_dirs + [env.get("PATH", "")])
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    env.setdefault("PYTHONUTF8", "1")
+    return env
 
 
 def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -36,6 +74,7 @@ def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[st
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        env=tool_env(),
     )
 
 
@@ -55,6 +94,9 @@ def resolve_tool(name: str) -> str | None:
     path = shutil.which(name)
     if path:
         return path
+    for candidate in KNOWN_TOOL_PATHS.get(name, []):
+        if candidate.exists():
+            return str(candidate)
     return None
 
 
@@ -79,6 +121,11 @@ def safe_stem(value: str, fallback: str = "video") -> str:
         base = parsed.netloc or fallback
     base = re.sub(r"[^A-Za-z0-9._-]+", "_", base).strip("._-")
     return base[:80] or fallback
+
+
+def default_output_dir(source: str, quarantine_root: Path) -> Path:
+    created = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
+    return quarantine_root / f"{created}-{safe_stem(source)}"
 
 
 def extension_from_response(url: str, content_type: str | None) -> str:
@@ -172,7 +219,7 @@ def ytdlp_command() -> list[str]:
         import yt_dlp  # noqa: F401
 
         return [sys.executable, "-m", "yt_dlp"]
-    except Exception:
+    except ImportError:
         return [require_tool("yt-dlp")]
 
 
@@ -519,6 +566,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Create analysis-ready artifacts from a local video or public URL.")
     parser.add_argument("source", nargs="?", help="Local video file or public unauthenticated HTTP(S) URL to ingest.")
     parser.add_argument("--output-dir", type=Path, default=None, help="Directory for generated artifacts.")
+    parser.add_argument(
+        "--quarantine-root",
+        type=Path,
+        default=DEFAULT_QUARANTINE_ROOT,
+        help="Root for generated artifacts when --output-dir is omitted. Defaults to VIDEO_INGEST_QUARANTINE_ROOT or ~/Video-Ingest-Quarantine.",
+    )
     parser.add_argument("--url-mode", choices=["auto", "direct", "yt-dlp"], default="auto", help="How to fetch HTTP(S) URLs.")
     parser.add_argument("--frame-mode", choices=["sample", "key", "all", "none"], default="sample")
     parser.add_argument("--fps", type=float, default=1.0, help="Frames per second when --frame-mode sample is used.")
@@ -556,6 +609,8 @@ def check_deps() -> int:
     print("Python dependencies:")
     for name, status in py_deps.items():
         print(f"  {name}: optional: {status}")
+    print("Default quarantine root:")
+    print(f"  {DEFAULT_QUARANTINE_ROOT}")
     return 0 if deps["ffmpeg"] and deps["ffprobe"] else 2
 
 
@@ -568,13 +623,10 @@ def main() -> int:
     if args.fps <= 0:
         raise SystemExit("--fps must be greater than 0.")
 
+    quarantine_root = args.quarantine_root.expanduser().resolve()
     output_dir = args.output_dir
     if output_dir is None:
-        if is_http_url(args.source):
-            output_dir = Path.cwd() / f"{safe_stem(args.source)}_analysis"
-        else:
-            local_source = Path(args.source).expanduser().resolve()
-            output_dir = local_source.parent / f"{local_source.stem}_analysis"
+        output_dir = default_output_dir(args.source, quarantine_root)
     output_dir = output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 

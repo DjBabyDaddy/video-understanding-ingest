@@ -15,6 +15,26 @@ This project turns an authorized local video, public unauthenticated video URL, 
 
 It is designed for learning from creator videos, coding walkthroughs, technical demos, and build logs without keeping bulky raw artifacts forever.
 
+## Why This Upgrade Is Different
+
+The first release was useful but artifact-heavy: if you forgot `--output-dir`,
+raw frames, audio, transcripts, OCR, contact sheets, and indexes were written
+beside the source video.
+
+The upgraded flow is quarantine-first and learning-first:
+
+- `video_digest.py` is the preferred path for learning. It creates durable
+  Obsidian-ready notes and removes temporary raw artifacts by default.
+- `video_ingest.py` still creates full audit/debug evidence, but omitted
+  `--output-dir` now writes to `VIDEO_INGEST_QUARANTINE_ROOT` or
+  `~/Video-Ingest-Quarantine`.
+- Dependency checks now show the active quarantine root and the runtime can add
+  known FFmpeg/FFprobe locations to subprocesses so Whisper and FFmpeg-based
+  steps work more reliably on Windows.
+- The skill guidance now treats each video as a reusable source item: transcript,
+  OCR, frames, metadata, and contact sheets feed tools, workflows, risks, content
+  ideas, and implementation leads instead of stopping at raw extraction.
+
 ## Safety Boundary
 
 Use this only for content you are allowed to access and process.
@@ -70,8 +90,11 @@ $env:VIDEO_INGEST_TESSERACT = "C:\path\to\tesseract.exe"
 Analyze a local file:
 
 ```powershell
-python .\skill\video-understanding-ingest\scripts\video_ingest.py "C:\path\to\video.mp4" --output-dir .\analysis --frame-mode sample --fps 1 --transcribe auto --ocr auto
+python .\skill\video-understanding-ingest\scripts\video_ingest.py "C:\path\to\video.mp4" --frame-mode sample --fps 1 --transcribe auto --ocr auto
 ```
+
+Use `--output-dir .\analysis` only when you deliberately want artifacts in a
+specific audit/debug folder.
 
 Analyze a public unauthenticated URL:
 
